@@ -6,7 +6,7 @@ global USR
 global PWD
 global REG
 
-def login_scrn():
+def login_scrn(connection):
     global USR
     global PWD
 
@@ -24,28 +24,22 @@ def login_scrn():
     else:
         login_scrn()
 
-    connStr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
     checkUsr = "SELECT usr, pwd FROM users WHERE usr=:USR and pwd=:PWD"
-    try:
-        connection = cx_Oracle.connect(connStr)
-        curs = connection.cursor()
-        curs.execute(checkUsr, USR=USR, PWD=PWD)
 
-        rows = curs.fetchone()
-        if USR == rows[0] and PWD == rows[1]:
-            print("Login is successful.")
-        else:
-            print("Login or password is incorrect.")
+    curs = connection.cursor()
+    curs.execute(checkUsr, USR=USR, PWD=PWD)
+
+    row = curs.fetchmany(numRows = 2)
+    print(row)
+    print(row)
+    #if USR == row[0] and PWD == row[1]:
+        #    print("Login is successful.")
+        #else:
+        #    print("Login or password is incorrect.")
 
 
-        curs.close()
-        connection.close()
+    curs.close()
 
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-
-        print(sys.stderr, "Oracle code:", error.code)
-        print(sys.stderr, "Oracle message:", error.message)
 
 
 def check_usr_pwd():
@@ -96,9 +90,21 @@ def main():
     global USR
     global PWD
 
-    login_scrn()
+    connstr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
 
-    tweetScrn()
+    try:
+        connection = cx_Oracle.connect(connstr)
+
+    except cx_Oracle.DatabaseError as exc:
+        error, = exc.args
+        print(sys.stderr, "Oracle code:", error.code)
+        print(sys.stderr, "Oracle message:", error.message)
+
+    login_scrn(connection)
+
+    #tweetScrn()
+
+    connection.close()
 
 
 main()
