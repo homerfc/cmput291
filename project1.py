@@ -1,11 +1,12 @@
 import sys
 import cx_Oracle
+import random
 
 
 global USR
 global PWD
-global REG
 
+#main menu, check for user id and password
 def login_scrn(connection):
     global USR
     global PWD
@@ -18,7 +19,8 @@ def login_scrn(connection):
         print("Password:")
         PWD = input()
     elif command == '2':
-        print('Start registration.')
+        print("Let's create a new account for you.")
+        crt_new_acc(connection)
     elif command == '3':
         exit()
     else:
@@ -29,61 +31,70 @@ def login_scrn(connection):
     curs = connection.cursor()
     curs.execute(checkUsr, USR=USR, PWD=PWD)
 
-    row = curs.fetchmany(numRows = 2)
-    print(row)
-    print(row)
-    #if USR == row[0] and PWD == row[1]:
-        #    print("Login is successful.")
-        #else:
-        #    print("Login or password is incorrect.")
-
-
+    cnt = len(curs.fetchall())
+    if cnt > 0:
+        print("Login is successful.")
+    else:
+        print("Password is incorrect.")
+        login_scrn(connection)
     curs.close()
 
+#check the password for uniqness
+def check_uniq(connection, usrid):
+    checkUniq = "SELECT usr FROM users WHERE usr = :usrid"
 
-
-def check_usr_pwd():
-    connStr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
-    checkUsr = "SELECT usr FROM users WHERE usr=:1 and pwd=:2"
-    try:
-        connection = cx_Oracle.connect(connStr)
-        curs = connection.cursor()
-        curs.execute(checkUsr, (USR, PWD))
-
-        rows = curs.fetchall()
-        print("Login is successful.")
+    curs = connection.cursor()
+    curs.execute(checkUniq, usrid = usrid)
+    cnt = len(curs.fetchall())
+    if cnt > 0:
+        print("User id is exist. Pick another ID.")
         curs.close()
-        connection.close()
+        return True
+    else:
+        return False
 
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        print("Login or password is incorrect.")
+#creates new account and insert the info to database
+def crt_new_acc(connection):
+    random.seed()
+    usrid = random.randint(0, 10000)
+    print("Your user ID will be: " + str(usrid))
+    if check_uniq(connection, usrid):
+        print("This user ID is already exist. We will generate a new one.")
+        crt_new_acc(connection)
+    else:
+        print("Now we need a bit of personal info.")
+        print("Name:")
+        name = input()
+        print("Password (4 characters long):")
+        pwd = input()
+        print("Email:")
+        email = input()
+        print("City:")
+        city = input()
+        print("Timezone:")
+        tmzn = input()
+        print("Great! Please save your ID and password. You will need it to sign in.")
+        insertNewUsr = "INSERT INTO users VALUES (:1, :2, :3, :4, :5, :6)"
+        curs = connection.cursor()
+        curs.execute(insertNewUsr, (usrid, pwd, name, email, city, tmzn))
+        connection.commit()
+        curs.close()
+        login_scrn(connection)
 
-        print(sys.stderr, "Oracle code:", error.code)
-        print(sys.stderr, "Oracle message:", error.message)
-
-
-def tweetScrn():
+#displays the last 5 tweets of the user
+def tweet_scrn(connection):
     global USR
     global PWD
 
-    connStr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
     getTweets = "SELECT text FROM tweets WHERE writer = :USR ORDER BY tdate"
-    try:
-        connection = cx_Oracle.connect(connStr)
-        curs = connection.cursor()
-        curs.execute(getTweets, USR=USR)
-        rows = curs.fetchall()
-        print("Your fresh tweets:")
-        for row in rows:
-            print(row)
-        curs.close()
-        connection.close()
 
-    except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        print(sys.stderr, "Oracle code:", error.code)
-        print(sys.stderr, "Oracle message:", error.message)
+    curs = connection.cursor()
+    curs.execute(getTweets, USR=USR)
+    rows = curs.fetchall()
+    print("Your fresh tweets:")
+    for row in rows:
+        print(row)
+    curs.close()
 
 
 def main():
@@ -102,7 +113,7 @@ def main():
 
     login_scrn(connection)
 
-    #tweetScrn()
+    tweet_scrn(connection)
 
     connection.close()
 
