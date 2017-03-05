@@ -1,12 +1,13 @@
 import sys
 import cx_Oracle
 import random
+import datetime
 
 
 global USR
 global PWD
 
-#main menu, check for user id and password
+#login and signup, check for user id and password
 def login_scrn(connection):
     global USR
     global PWD
@@ -33,7 +34,9 @@ def login_scrn(connection):
 
     cnt = len(curs.fetchall())
     if cnt > 0:
+        print('')
         print("Login is successful.")
+        print('')
     else:
         print("Password is incorrect.")
         login_scrn(connection)
@@ -53,7 +56,7 @@ def check_uniq(connection, usrid):
     else:
         return False
 
-#creates new account and insert the info to database
+#creates new account and insert the info to the database
 def crt_new_acc(connection):
     random.seed()
     usrid = random.randint(0, 10000)
@@ -81,20 +84,55 @@ def crt_new_acc(connection):
         curs.close()
         login_scrn(connection)
 
+def main_menu():
+    line = "______________________________________"
+    print(line)
+    mainmenu = "What do you want to do next?"
+    print(mainmenu)
+    menu = ["1 - Search for tweets", "2 - Search for users", "3 - Write a tweet", "4 - Followers", "5 - Logout"]
+    for com in menu:
+        print(com)
+
 #displays the last 5 tweets of the user
 def tweet_scrn(connection):
     global USR
     global PWD
 
-    getTweets = "SELECT text FROM tweets WHERE writer = :USR ORDER BY tdate"
+    getTweets = ("SELECT distinct t.writer, t.tdate, t.text FROM tweets t "
+    "WHERE t.writer in (select f.flwee from follows f where f.flwer = :USR) ORDER BY tdate")
 
     curs = connection.cursor()
     curs.execute(getTweets, USR=USR)
-    rows = curs.fetchall()
-    print("Your fresh tweets:")
-    for row in rows:
-        print(row)
+    rows = curs.fetchmany(numRows = 5)
+    swt = True
+
+    while swt:
+        endmsg = "Sorry, we have reached the end of your feed."
+        if len(rows) == 0:
+            print('')
+            print(endmsg)
+            swt = False
+        else:
+            for i in rows:
+                print(i[0], "|", i[1].strftime('%d-%b-%Y'), "|", i[2], "|")
+        rows = curs.fetchmany(numRows = 5)
+        if len(rows) == 0:
+            print('')
+            print(endmsg)
+            swt = False
+        else:
+            print("Do you want to see more? Yes or no:")
+            comm = input()
+            comm.lower()
+            if comm in ('yes', 'y'):
+                continue
+            else:
+                print('')
+                print(endmsg)
+                swt = False
+
     curs.close()
+    main_menu() #function of choises
 
 
 def main():
