@@ -6,11 +6,13 @@ import datetime
 
 global USR
 global PWD
+global CONNECTION
 
 #login and signup, check for user id and password
-def login_scrn(connection):
+def login_scrn():
     global USR
     global PWD
+    global CONNECTION
 
     command = input('Type 1 to Log in. Type 2 to create New account. Type 3 to exit.')
 
@@ -21,7 +23,7 @@ def login_scrn(connection):
         PWD = input()
     elif command == '2':
         print("Let's create a new account for you.")
-        crt_new_acc(connection)
+        crt_new_acc()
     elif command == '3':
         exit()
     else:
@@ -29,7 +31,7 @@ def login_scrn(connection):
 
     checkUsr = "SELECT usr, pwd FROM users WHERE usr=:USR and pwd=:PWD"
 
-    curs = connection.cursor()
+    curs = CONNECTION.cursor()
     curs.execute(checkUsr, USR=USR, PWD=PWD)
 
     cnt = len(curs.fetchall())
@@ -37,16 +39,19 @@ def login_scrn(connection):
         print('')
         print("Login is successful.")
         print('')
+        tweet_scrn()
     else:
         print("Password is incorrect.")
-        login_scrn(connection)
+        login_scrn()
     curs.close()
 
 #check the password for uniqness
-def check_uniq(connection, usrid):
+def check_uniq(usrid):
+    global CONNECTION
+
     checkUniq = "SELECT usr FROM users WHERE usr = :usrid"
 
-    curs = connection.cursor()
+    curs = CONNECTION.cursor()
     curs.execute(checkUniq, usrid = usrid)
     cnt = len(curs.fetchall())
     if cnt > 0:
@@ -57,13 +62,15 @@ def check_uniq(connection, usrid):
         return False
 
 #creates new account and insert the info to the database
-def crt_new_acc(connection):
+def crt_new_acc():
+    global CONNECTION
+
     random.seed()
     usrid = random.randint(0, 10000)
     print("Your user ID will be: " + str(usrid))
-    if check_uniq(connection, usrid):
+    if check_uniq(usrid):
         print("This user ID is already exist. We will generate a new one.")
-        crt_new_acc(connection)
+        crt_new_acc()
     else:
         print("Now we need a bit of personal info.")
         print("Name:")
@@ -78,13 +85,15 @@ def crt_new_acc(connection):
         tmzn = input()
         print("Great! Please save your ID and password. You will need it to sign in.")
         insertNewUsr = "INSERT INTO users VALUES (:1, :2, :3, :4, :5, :6)"
-        curs = connection.cursor()
+        curs = CONNECTION.cursor()
         curs.execute(insertNewUsr, (usrid, pwd, name, email, city, tmzn))
-        connection.commit()
+        CONNECTION.commit()
         curs.close()
-        login_scrn(connection)
+        login_scrn()
 
 def main_menu():
+    global USR
+
     line = "______________________________________"
     print(line)
     mainmenu = "What do you want to do next?"
@@ -92,16 +101,33 @@ def main_menu():
     menu = ["1 - Search for tweets", "2 - Search for users", "3 - Write a tweet", "4 - Followers", "5 - Logout"]
     for com in menu:
         print(com)
+    comm = input()
+    if comm == '1':
+        pass
+    elif comm == '2':
+        print("Type your keyword to search:")
+        keyword = input()
+        search_for_tweets(keyword)
+    elif comm == '3':
+        pass
+    elif comm == '4':
+        list_Followers(USR)
+    elif comm == '5':
+        print("You are logout successfuly.")
+        USR = 0
+        PWD = 0
+        login_scrn()
 
 #displays the last 5 tweets of the user
-def tweet_scrn(connection):
+def tweet_scrn():
     global USR
     global PWD
+    global CONNECTION
 
     getTweets = ("SELECT distinct t.writer, t.tdate, t.text FROM tweets t "
     "WHERE t.writer in (select f.flwee from follows f where f.flwer = :USR) ORDER BY tdate")
 
-    curs = connection.cursor()
+    curs = CONNECTION.cursor()
     curs.execute(getTweets, USR=USR)
     rows = curs.fetchmany(numRows = 5)
     swt = True
@@ -134,26 +160,114 @@ def tweet_scrn(connection):
     curs.close()
     main_menu() #function of choises
 
+# def search_for_tweets(keyword):
+#     #keyword should be a list of keyword i.e keyword = ["string", "string2",...]
+#     #access the hashtage table and tweets table for the hashtag and tweet content
+#     global CONNECTION
+#
+#     query = "select term from hashtags"
+#     curs.execute(query)
+#     hashtag = curs.fetchall()
+#
+#     keyword_len = len(keyword)
+#     for keyword_range in keyword_len:
+#         while (True):
+#             if keyword[keyword_range] in hashtag:
+#                 display_tweet_hashtag(keyword[keyword_range])
+#             elif keyword[keyword_range]:
+#
+#             else:
+#                 print("There is no content matches.")
+#                 break # need to be fixed
 
-def main():
-    global USR
-    global PWD
-
-    connstr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
+def list_Followers(usrID):
+    global connection
 
     try:
-        connection = cx_Oracle.connect(connstr)
+
+        follower = "SELECT f.flwer, u.name FROM follows f, users u WHERE flwee =:usrID and usr = f.flwer"
+        curs = CONNECTION.cursor()
+
+        curs.execute(follower, usrID = usrID)
+        rows = curs.fetchall()
+        if len(rows) == 0:
+            print("Sorry, you don't have any followers and followees.")
+        else:
+            print("______________________________________")
+            print('ID', '|', "Name")
+            for row in rows:
+                print(row[0], '|', row[1])
+        print("______________________________________")
+
+        print("Select for more actions\n1.More details about "
+         "follower\n2.See more tweets\n3.Follow the selected user:\n4. Return to the main menu.")
+        options = input()
+        if options == '1':
+            see_more_details()
+        elif options == '2':
+            see_more_tweets()
+        elif options == '3':
+            start_to_follow(usrID)
+        elif options == '4':
+            main_menu()  #return to the main menu)
+        else:
+            list_Followers(USR)
 
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         print(sys.stderr, "Oracle code:", error.code)
         print(sys.stderr, "Oracle message:", error.message)
 
-    login_scrn(connection)
+def see_more_details():
+    global connection
+    print("Select one follower to see more details:")
+    detail = input()
+    try:
+        flwerdtl = ("SELECT COUNT(t.tid) FROM tweets t WHERE t.writer = :detail "
+        "UNION SELECT COUNT(f.flwee) FROM follows f WHERE f.flwer = :detail UNION SELECT COUNT(f.flwer) "
+        "FROM follows f where f.flwee = :detail")
+        flwer3tweets = "SELECT tid, text FROM tweets WHERE writer = :detail ORDER BY tdate"
 
-    tweet_scrn(connection)
+        curs = CONNECTION.cursor()
+        curs.execute(flwerdtl, detail = detail)
+        details = curs.fetchmany(numRows = 3)
 
-    connection.close()
+        print('User:', detail, '|', 'Number of tweets:', details[2][0], '|',
+        'Number of followees:', details[1][0], '|', 'Number of followers:', details[0][0])
+
+        curs.execute(flwer3tweets, detail = detail)
+        tweets = curs.fetchmany(3)
+
+        for row in tweets:
+            print(row[0], '|', row[1])
+
+        curs.close()
+
+    except cx_Oracle.DatabaseError as exc:
+        error, = exc.args
+        print(sys.stderr, "Oracle code:", error.code)
+        print(sys.stderr, "Oracle message:", error.message)
+
+def main():
+    global USR
+    global PWD
+    global CONNECTION
+
+    connstr = "lebedev/23048424S@gwynne.cs.ualberta.ca:1521/CRS"
+
+    try:
+        CONNECTION = cx_Oracle.connect(connstr)
+
+    except cx_Oracle.DatabaseError as exc:
+        error, = exc.args
+        print(sys.stderr, "Oracle code:", error.code)
+        print(sys.stderr, "Oracle message:", error.message)
+
+    login_scrn()
+
+    #tweet_scrn()
+
+    CONNECTION.close()
 
 
 main()
