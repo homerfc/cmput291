@@ -160,26 +160,6 @@ def tweet_scrn():
     curs.close()
     main_menu() #function of choises
 
-# def search_for_tweets(keyword):
-#     #keyword should be a list of keyword i.e keyword = ["string", "string2",...]
-#     #access the hashtage table and tweets table for the hashtag and tweet content
-#     global CONNECTION
-#
-#     query = "select term from hashtags"
-#     curs.execute(query)
-#     hashtag = curs.fetchall()
-#
-#     keyword_len = len(keyword)
-#     for keyword_range in keyword_len:
-#         while (True):
-#             if keyword[keyword_range] in hashtag:
-#                 display_tweet_hashtag(keyword[keyword_range])
-#             elif keyword[keyword_range]:
-#
-#             else:
-#                 print("There is no content matches.")
-#                 break # need to be fixed
-
 def list_Followers(usrID):
     global connection
 
@@ -200,15 +180,11 @@ def list_Followers(usrID):
         print("______________________________________")
 
         print("Select for more actions\n1.More details about "
-         "follower\n2.See more tweets\n3.Follow the selected user:\n4. Return to the main menu.")
+         "a follower\n2.Return to the main menu")
         options = input()
         if options == '1':
             see_more_details()
         elif options == '2':
-            see_more_tweets()
-        elif options == '3':
-            start_to_follow(usrID)
-        elif options == '4':
             main_menu()  #return to the main menu)
         else:
             list_Followers(USR)
@@ -220,13 +196,14 @@ def list_Followers(usrID):
 
 def see_more_details():
     global connection
+
     print("Select one follower to see more details:")
     detail = input()
     try:
         flwerdtl = ("SELECT COUNT(t.tid) FROM tweets t WHERE t.writer = :detail "
         "UNION SELECT COUNT(f.flwee) FROM follows f WHERE f.flwer = :detail UNION SELECT COUNT(f.flwer) "
         "FROM follows f where f.flwee = :detail")
-        flwer3tweets = "SELECT tid, text FROM tweets WHERE writer = :detail ORDER BY tdate"
+
 
         curs = CONNECTION.cursor()
         curs.execute(flwerdtl, detail = detail)
@@ -235,18 +212,65 @@ def see_more_details():
         print('User:', detail, '|', 'Number of tweets:', details[2][0], '|',
         'Number of followees:', details[1][0], '|', 'Number of followers:', details[0][0])
 
-        curs.execute(flwer3tweets, detail = detail)
-        tweets = curs.fetchmany(3)
-
-        for row in tweets:
-            print(row[0], '|', row[1])
+        see_more_tweets(detail)
 
         curs.close()
 
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
+        
         print(sys.stderr, "Oracle code:", error.code)
         print(sys.stderr, "Oracle message:", error.message)
+
+def see_more_tweets(idofusr):
+    global CONNECTION
+    global USR
+
+    flwer3tweets = "SELECT tid, text FROM tweets WHERE writer = :detail ORDER BY tdate"
+
+    curs = CONNECTION.cursor()
+    curs.execute(flwer3tweets, detail = idofusr)
+    tweets = curs.fetchmany(3)
+
+    for row in tweets:
+        print(row[0], '|', row[1])
+
+    print('What do you want to do next?\n1.See more tweets of the user\n2.Follow the user\n3.Return to the list of followers')
+    comm = input()
+
+    if comm == '1':
+        while len(tweets) > 0:
+            tweets = curs.fetchmany(3)
+            for row in tweets:
+                print(row[0], '|', row[1])
+        print('No more tweets.')
+        print('1.Return to the list of followers\n2.Follow the user')
+        comm2 = input()
+        if comm2 == '2':
+            follow_user(idofusr)
+            print("You are following the user now.")
+            list_Followers(USR)
+        else:
+            list_Followers(USR)
+    elif comm == '2':
+        follow_user(idofusr)
+        print("You are following the user now.")
+        list_Followers(USR)
+    else:
+        list_Followers(USR)
+
+def follow_user(usrtofollow):
+    global USR
+    global CONNECTION
+
+    d4te = datetime.datetime.now()
+
+    follow = "INSERT INTO follows(flwer, flwee, start_date) values (:USR, :usrtofollow, to_date(:d4te, 'yyyy-mm-dd'))"
+
+    curs = CONNECTION.cursor()
+    curs.execute(follow, {'USR':USR, 'usrtofollow':usrtofollow, 'd4te':d4te })
+    CONNECTION.commit()
+    curs.close()
 
 def main():
     global USR
@@ -264,8 +288,6 @@ def main():
         print(sys.stderr, "Oracle message:", error.message)
 
     login_scrn()
-
-    #tweet_scrn()
 
     CONNECTION.close()
 
